@@ -128,8 +128,8 @@ class Environment:
             radius = ti.random() * self.ball_radius
             degree = ti.random() * 360 
             spread = 0.1
-            new_x = ti.math.cos(degree)*radius*spread  + 0.5
-            new_y = ti.math.sin(degree)*radius*spread  + 0.5
+            new_x = ti.math.cos(degree)*radius*spread + 0.5
+            new_y = ti.math.sin(degree)*radius*spread + 0.5
             self.x[i] = [new_x, new_y]
             self.material[i] = 1 # 0: fluid 1: jelly 2: snow
             self.v[i] = [0, 0]
@@ -142,8 +142,8 @@ class Environment:
             radius = ti.random() * self.ball_radius
             degree = ti.random() * 2*ti.math.pi
             spread = 0.1
-            new_x = ti.math.cos(degree)*radius*spread  + 0.3 + 0.10 * 0 #(i // group_size)
-            new_y = ti.math.sin(degree)*radius*spread  + 0.05 + 0.32 * 0
+            new_x = ti.math.cos(degree)*radius*spread + 0.5
+            new_y = ti.math.sin(degree)*radius*spread + 1e-4
             self.x[i] = [new_x, new_y]
             self.material[i] = 0 # 0: fluid 1: jelly 2: snow
             self.v[i] = [0, 0]

@@ -12,6 +12,9 @@ ball_radius = 0.2
 jet_r = ball_radius/2
 jet_power = 20
 shoot_length = 20 #Number of frames until a "shot" takes
+ratio = 0.4
+floor_h = 0.025
+
 #_______________
 dx, inv_dx = 1 / n_grid, float(n_grid)
 dt = 1e-4 / quality
@@ -125,35 +128,36 @@ def reset():
     create random position, for the ball we randomize polar coords and recast them to normal ones 
     """
     group_size = n_particles // 2
-    #Init ball
-    ratio = 0.4
+    # Init ball
     for i in range(ratio*group_size):
         radius = ti.random() * ball_radius
         degree = ti.random() * 360 
         spread = 0.1
-        new_x = ti.math.cos(degree)*radius*spread  + 0.5
-        new_y = ti.math.sin(degree)*radius*spread  + 0.5
+        new_x = ti.math.cos(degree)*radius*spread + 0.5
+        new_y = ti.math.sin(degree)*radius*spread + 0.5
         x[i] = [new_x, new_y]
         material[i] = 1 # 0: fluid 1: jelly 2: snow
         v[i] = [0, 0]
         F[i] = ti.Matrix([[1, 0], [0, 1]])
         Jp[i] = 1
         C[i] = ti.Matrix.zero(float, 2, 2)
-    #Init water
-    #TODO: think about paramaters
+    
+    # Init water
+    # TODO: think about paramaters
     for i in range(ratio*group_size, n_particles):
         radius = ti.random() * ball_radius
         degree = ti.random() * 2*ti.math.pi
         spread = 0.1
-        new_x = ti.math.cos(degree)*radius*spread  + 0.3 + 0.10 * 0 #(i // group_size)
-        new_y = ti.math.sin(degree)*radius*spread  + 0.05 + 0.32 * 0
+        new_x = ti.math.cos(degree)*radius*spread + 0.5
+        new_y = ti.math.sin(degree)*radius*spread + 0.05
         x[i] = [new_x, new_y]
         material[i] = 0 # 0: fluid 1: jelly 2: snow
         v[i] = [0, 0]
         F[i] = ti.Matrix([[1, 0], [0, 1]])
         Jp[i] = 1
         C[i] = ti.Matrix.zero(float, 2, 2)  
-    #Init jet
+    
+    # Init jet
     jet_attributes[None] = [0.5, ti.math.pi/2]
 
 @ti.kernel
@@ -182,44 +186,72 @@ def main():
             elif gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
                 break
             elif gui.event.key == 'a':
-                tmp = ti.math.max(jet_attributes[None][0]-jet_speed, 0)
+                tmp = ti.math.max(jet_attributes[None][0] - jet_speed, jet_r/2)
                 jet_attributes[None] = [tmp, jet_attributes[None][1]]
-                print(jet_attributes)
             elif gui.event.key == 'd':
-                tmp = ti.math.min(jet_attributes[None][0]+jet_speed, 1)
+                tmp = ti.math.min(jet_attributes[None][0] + jet_speed, 1 - jet_r/2)
                 jet_attributes[None] = [tmp, jet_attributes[None][1]]
-                print(jet_attributes)
+        
+        # update jet direction
         mouse = gui.get_cursor_pos()
-        jet_x = jet_attributes[None][0]
-        #Compute the angle between the cursor and the jet's location
-        mouse_jet_angle = ti.math.acos((mouse[0]- jet_x)/ti.math.sqrt(ti.math.max(1e-4,(mouse[0]- jet_x)**2 + mouse[1]**2)))
-        if mouse_jet_angle > jet_attributes[None][1]:
-            jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1]+jet_angular_speed)
-        elif mouse_jet_angle < jet_attributes[None][1]:
-            jet_attributes[None][1] = ti.math.max(jet_attributes[None][1]-jet_angular_speed, 0)
-        #LMB is pressed, shoot water
+        if mouse[1] > 1e-4:
+            jet_x = jet_attributes[None][0]
+            # Compute the angle between the cursor and the jet's location
+            mouse_jet_angle = ti.math.acos((mouse[0]- jet_x)/ti.math.sqrt(ti.math.max(1e-4,(mouse[0] - jet_x)**2 + mouse[1]**2)))
+            if mouse_jet_angle - 1.1*jet_angular_speed > jet_attributes[None][1]:
+                jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1] + jet_angular_speed)
+            elif mouse_jet_angle + 1.1*jet_angular_speed < jet_attributes[None][1]:
+                jet_attributes[None][1] = ti.math.max(jet_attributes[None][1] - jet_angular_speed)
+        
+        # LMB is pressed, shoot water
         if gui.is_pressed(ti.GUI.LMB):
             particle_shot_counter = shoot_length
-        if particle_shot_counter > 0 :
+        if particle_shot_counter > 0:
             batch = 20
-            start = random_pos() * (n_particles - 400 - batch) + 400 #TODO Parametrize number of ball particles
-            for i in range(int(start), int(start + batch)):
-                new_x = random_pos()*jet_r
-                x[i] = [new_x + jet_attributes[None][0],1e-4] 
-                v[i] = [jet_power*ti.math.cos(jet_attributes[None][1]), jet_power*ti.math.sin(jet_attributes[None][1])]
+            start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles) #TODO Parametrize number of ball particles
+            for i in range(start, start + batch):
+                new_x = random_pos() * jet_r
+                x[i] = [new_x + jet_attributes[None][0] - jet_r/2, floor_h] 
+                v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
             particle_shot_counter -= 1
+        
         gui.circle((mouse[0], mouse[1]), color=0x336699, radius=15)
         attractor_pos[None] = [mouse[0], mouse[1]]
         attractor_strength[None] = 0
         if gui.is_pressed(ti.GUI.RMB):
             attractor_strength[None] = -1 #shoot air
+
         for s in range(int(2e-3 // dt)):
             #pass
             substep()
+
+        # display particles
         gui.circles(x.to_numpy(),
                     radius=1.5,
                     palette=[0x068587, 0xED553B, 0xEEEE00],
                     palette_indices=material)
+
+        # ugly jet
+        jet_h = 0.04
+        jet_color = 0x444444
+        origin = [jet_attributes[None][0], floor_h]
+        vec1 = [ti.math.cos(jet_attributes[None][1]), ti.math.sin(jet_attributes[None][1])]
+        vec2 = [vec1[1], -vec1[0]]
+        ref_A = [origin[0] + jet_r/2 * vec2[0], origin[1] + jet_r/2 * vec2[1]]
+        ref_B = [origin[0] - jet_r/2 * vec2[0], origin[1] - jet_r/2 * vec2[1]]
+        point_A = [ref_A[0] - vec1[0], ref_A[1] - vec1[1]]
+        point_B = [ref_B[0] - vec1[0], ref_B[1] - vec1[1]]
+        point_C = [ref_B[0] + jet_h * vec1[0], ref_B[1] + jet_h * vec1[1]]
+        point_D = [ref_A[0] + jet_h * vec1[0], ref_A[1] + jet_h * vec1[1]]
+        gui.triangle(point_A, point_B, point_C, color=jet_color)
+        gui.triangle(point_A, point_C, point_D, color=jet_color)
+        # upper part is wider
+        point_A1 = [ref_A[0] + jet_r/8 * vec2[0], ref_A[1] + jet_r/8 * vec2[1]]
+        point_B1 = [ref_B[0] - jet_r/8 * vec2[0], ref_B[1] - jet_r/8 * vec2[1]]
+        point_C1 = [point_C[0] - jet_r/8 * vec2[0], point_C[1] - jet_r/8 * vec2[1]]
+        point_D1 = [point_D[0] + jet_r/8 * vec2[0], point_D[1] + jet_r/8 * vec2[1]]
+        gui.triangle(point_A1, point_B1, point_C1, color=jet_color)
+        gui.triangle(point_A1, point_C1, point_D1, color=jet_color)
 
         # Change to gui.show(f'{frame:06d}.png') to write images to disk
         gui.show()
