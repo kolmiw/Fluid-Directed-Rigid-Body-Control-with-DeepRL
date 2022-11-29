@@ -1,0 +1,11 @@
+{
+    "quality" : 1,
+    "jet_speed" : 0.05,
+    "jet_angular_speed" :  0.01,
+    "ball_radius" : 0.2,
+    "jet_r" : 2,
+    "jet_power" : 20,
+    "shoot_length" : 3,
+    "batch" : 20,
+    "particle_multiplier" : 9000
+}

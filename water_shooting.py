@@ -2,11 +2,10 @@ import taichi as ti
 
 ti.init(arch=ti.gpu)  # Try to run on GPU
 
-
 #______________Convenience parameters
 RESOLUTION = 512
 quality = 1  # Use a larger value for higher-res simulations
-n_particles, n_grid = 9000 * quality**2, 64 * quality
+n_particles, n_grid = 2000 * quality**2, 64 * quality
 jet_speed = 0.05
 jet_angular_speed =  jet_speed * ti.math.pi
 ball_radius = 0.2
@@ -161,66 +160,70 @@ def reset():
 def random_pos() -> ti.f32:
     return ti.random()
 
+def main():
+    gui = ti.GUI("Neil's and Robert's fun project uwu", res=RESOLUTION, background_color=0xABACAC)
+    reset()
+    gravity[None] = [0, -1]
+    particle_shot_counter = 0
+    for frame in range(20000):
+        print(x[0])
+        """
+        Managing gui inputs
+        r - Reset to initial state
+        esc - quits the program
+        any other button - sets the graviry to 0,1 xd
+        LMB - Shoot dihydrogen monoxide from the Particle accelerator
+        RMB - Left for debugging haha (secret)
+        A/D - move the ~jet~ particle accelerator to the left/right
+        """
+        if gui.get_event(ti.GUI.PRESS):
+            if gui.event.key == 'r':
+                reset()
+            elif gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
+                break
+            elif gui.event.key == 'a':
+                tmp = ti.math.max(jet_attributes[None][0]-jet_speed, 0)
+                jet_attributes[None] = [tmp, jet_attributes[None][1]]
+                print(jet_attributes)
+            elif gui.event.key == 'd':
+                tmp = ti.math.min(jet_attributes[None][0]+jet_speed, 1)
+                jet_attributes[None] = [tmp, jet_attributes[None][1]]
+                print(jet_attributes)
+        mouse = gui.get_cursor_pos()
+        jet_x = jet_attributes[None][0]
+        #Compute the angle between the cursor and the jet's location
+        mouse_jet_angle = ti.math.acos((mouse[0]- jet_x)/ti.math.sqrt(ti.math.max(1e-4,(mouse[0]- jet_x)**2 + mouse[1]**2)))
+        if mouse_jet_angle > jet_attributes[None][1]:
+            jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1]+jet_angular_speed)
+        elif mouse_jet_angle < jet_attributes[None][1]:
+            jet_attributes[None][1] = ti.math.max(jet_attributes[None][1]-jet_angular_speed, 0)
+        #LMB is pressed, shoot water
+        if gui.is_pressed(ti.GUI.LMB):
+            particle_shot_counter = shoot_length
+        if particle_shot_counter > 0 :
+            batch = 20
+            start = random_pos() * (n_particles - 400 - batch) + 400 #TODO Parametrize number of ball particles
+            for i in range(int(start), int(start + batch)):
+                new_x = random_pos()*jet_r
+                x[i] = [new_x + jet_attributes[None][0],1e-4] 
+                v[i] = [jet_power*ti.math.cos(jet_attributes[None][1]), jet_power*ti.math.sin(jet_attributes[None][1])]
+            particle_shot_counter -= 1
+        gui.circle((mouse[0], mouse[1]), color=0x336699, radius=15)
+        attractor_pos[None] = [mouse[0], mouse[1]]
+        attractor_strength[None] = 0
+        if gui.is_pressed(ti.GUI.RMB):
+            attractor_strength[None] = -1 #shoot air
+        for s in range(int(2e-3 // dt)):
+            #pass
+            substep()
+        gui.circles(x.to_numpy(),
+                    radius=1.5,
+                    palette=[0x068587, 0xED553B, 0xEEEE00],
+                    palette_indices=material)
 
-gui = ti.GUI("Neil's and Robert's fun project uwu", res=RESOLUTION, background_color=0xACACAC)
-reset()
-gravity[None] = [0, -1]
-particle_shot_counter = 0
-for frame in range(20000):
-    print(x[0])
-    """
-    Managing gui inputs
-    r - Reset to initial state
-    esc - quits the program
-    any other button - sets the graviry to 0,1 xd
-    LMB - Shoot dihydrogen monoxide from the Particle accelerator
-    RMB - Left for debugging haha (secret)
-    A/D - move the ~jet~ particle accelerator to the left/right
-    """
-    if gui.get_event(ti.GUI.PRESS):
-        if gui.event.key == 'r':
-            reset()
-        elif gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
-            break
-        elif gui.event.key == 'a':
-            tmp = ti.math.max(jet_attributes[None][0]-jet_speed, 0)
-            jet_attributes[None] = [tmp, jet_attributes[None][1]]
-            print(jet_attributes)
-        elif gui.event.key == 'd':
-            tmp = ti.math.min(jet_attributes[None][0]+jet_speed, 1)
-            jet_attributes[None] = [tmp, jet_attributes[None][1]]
-            print(jet_attributes)
-    mouse = gui.get_cursor_pos()
-    jet_x = jet_attributes[None][0]
-    #Compute the angle between the cursor and the jet's location
-    mouse_jet_angle = ti.math.acos((mouse[0]- jet_x)/ti.math.sqrt(ti.math.max(1e-4,(mouse[0]- jet_x)**2 + mouse[1]**2)))
-    if mouse_jet_angle > jet_attributes[None][1]:
-        jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1]+jet_angular_speed)
-    elif mouse_jet_angle < jet_attributes[None][1]:
-        jet_attributes[None][1] = ti.math.max(jet_attributes[None][1]-jet_angular_speed, 0)
-    #LMB is pressed, shoot water
-    if gui.is_pressed(ti.GUI.LMB):
-        particle_shot_counter = shoot_length
-    if particle_shot_counter > 0 :
-        batch = 20
-        start = random_pos() * (n_particles - 400 - batch) + 400 #TODO Parametrize number of ball particles
-        for i in range(int(start), int(start + batch)):
-            new_x = random_pos()*jet_r
-            x[i] = [new_x + jet_attributes[None][0],1e-4] 
-            v[i] = [jet_power*ti.math.cos(jet_attributes[None][1]), jet_power*ti.math.sin(jet_attributes[None][1])]
-        particle_shot_counter -= 1
-    gui.circle((mouse[0], mouse[1]), color=0x336699, radius=15)
-    attractor_pos[None] = [mouse[0], mouse[1]]
-    attractor_strength[None] = 0
-    if gui.is_pressed(ti.GUI.RMB):
-        attractor_strength[None] = -1 #shoot air
-    for s in range(int(2e-3 // dt)):
-        #pass
-        substep()
-    gui.circles(x.to_numpy(),
-                radius=1.5,
-                palette=[0x068587, 0xED553B, 0xEEEE00],
-                palette_indices=material)
+        # Change to gui.show(f'{frame:06d}.png') to write images to disk
+        gui.show()
 
-    # Change to gui.show(f'{frame:06d}.png') to write images to disk
-    gui.show()
+if __name__ == "__main__":
+    # execute only if run as a script
+    main()
