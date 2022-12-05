@@ -2,19 +2,20 @@ import numpy as np
 import torch
 import torch.nn as nn
 import water_shooting
-from Environment import *
 import json
 import math
 import random
 
-def mlp(size, activation, output_activation=nn.Identity):
+
+def mlp(sizes, activation, output_activation=nn.Identity):
     """Generates a basic MLP"""
     layers = []
-    for j in range(len(sizes)-1):
+    for j in range(len(sizes)-2):
         act = activation if j < len(sizes)-2 else output_activation
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
     
     return nn.Sequential(*layers)
+
 
 class MLPCritic(nn.Module):
     def __init__():
@@ -40,6 +41,7 @@ class MLPActorCritic(nn.Module):
             pi = self.pi_distribution(torch.as_tensor(state, dtype=torch.float))
             act = pi.sample() # pick a policy based on the probability distribution of π
             #TODO update Actor
+            act.step(state)
         return act
 
 class DummyActorCritic(nn.Module):
@@ -68,7 +70,7 @@ def main():
         setting = json.load(file)
 
     setting.update({'jet_angular_speed': (setting['jet_speed'] * math.pi)})
-    env = Environment(setting)
+    env = water_shooting
     agent = Agent(env)
     agent.play()
 
