@@ -211,7 +211,8 @@ def main():
             start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles) #TODO Parametrize number of ball particles
             for i in range(start, start + batch):
                 new_x = random_pos() * jet_r
-                x[i] = [new_x + jet_attributes[None][0] - jet_r/2, floor_h] 
+                new_y = random_pos() * 2 / n_grid
+                x[i] = [new_x + jet_attributes[None][0] - jet_r/2, new_y + floor_h] 
                 v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
             particle_shot_counter -= 1
         

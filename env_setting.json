@@ -7,5 +7,7 @@
     "jet_power" : 20,
     "shoot_length" : 3,
     "batch" : 20,
-    "particle_multiplier" : 9000
+    "particle_multiplier" : 9000,
+    "ratio" : 0.4,
+    "floor_h" : 0.025
 }

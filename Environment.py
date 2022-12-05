@@ -143,7 +143,7 @@ class Environment:
             degree = ti.random() * 2*ti.math.pi
             spread = 0.1
             new_x = ti.math.cos(degree)*radius*spread + 0.5
-            new_y = ti.math.sin(degree)*radius*spread + 1e-4
+            new_y = ti.math.sin(degree)*radius*spread + 0.05
             self.x[i] = [new_x, new_y]
             self.material[i] = 0 # 0: fluid 1: jelly 2: snow
             self.v[i] = [0, 0]
