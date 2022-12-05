@@ -8,11 +8,11 @@ quality = 1 # Use a larger value for higher-res simulations
 n_particles, n_grid = 2000 * quality**2, 64 * quality
 jet_speed = 0.05
 jet_angular_speed =  jet_speed * ti.math.pi
-ball_radius = 0.2
-jet_r = ball_radius/2
+ball_radius = 0.02
+jet_r = ball_radius*5
 jet_power = 20
-shoot_length = 20 #Number of frames until a "shot" takes
-ratio = 0.4
+shoot_length = 5 # Number of frames a "shot" takes
+ratio = 0.1
 floor_h = 0.025
 
 #_______________
@@ -32,12 +32,9 @@ F = ti.Matrix.field(2, 2, dtype=float,
                     shape=n_particles)  # deformation gradient
 material = ti.field(dtype=int, shape=n_particles)  # material id
 Jp = ti.field(dtype=float, shape=n_particles)  # plastic deformation
-grid_v = ti.Vector.field(2, dtype=float,
-                         shape=(n_grid, n_grid))  # grid node momentum/velocity
+grid_v = ti.Vector.field(2, dtype=float, shape=(n_grid, n_grid))  # grid node momentum/velocity
 grid_m = ti.field(dtype=float, shape=(n_grid, n_grid))  # grid node mass
 gravity = ti.Vector.field(2, dtype=float, shape=())
-attractor_strength = ti.field(dtype=float, shape=())
-attractor_pos = ti.Vector.field(2, dtype=float, shape=())
 jet_attributes = ti.Vector.field(2, dtype=float, shape=())
 
 
@@ -92,9 +89,6 @@ def substep():
             # Momentum to velocity
             grid_v[i, j] = (1 / grid_m[i, j]) * grid_v[i, j]
             grid_v[i, j] += dt * gravity[None] * 30  # gravity
-            dist = attractor_pos[None] - dx * ti.Vector([i, j])
-            grid_v[i, j] += \
-                dist / (0.01 + dist.norm()) * attractor_strength[None] * dt * 100
             if i < 3 and grid_v[i, j][0] < 0.5:
                 grid_v[i, j][0] = 0.5  # Boundary conditions
             if i > n_grid - 3 and grid_v[i, j][0] > 0:
@@ -127,15 +121,18 @@ def reset():
     """
     create random position, for the ball we randomize polar coords and recast them to normal ones 
     """
-    group_size = n_particles // 2
     # Init ball
-    for i in range(ratio*group_size):
-        radius = ti.random() * ball_radius
-        degree = ti.random() * 360 
-        spread = 0.1
-        new_x = ti.math.cos(degree)*radius*spread + 0.5
-        new_y = ti.math.sin(degree)*radius*spread + 0.5
-        x[i] = [new_x, new_y]
+    for i in range(ratio*n_particles):
+        if i == 0: # center of ball to track ball location
+            x[i] = [0.5, 0.5]
+        elif i == 1:
+            x[i] = [0.5 + ball_radius, 0.5] # to track ball rotation
+        else:
+            radius = ti.random() * ball_radius
+            degree = ti.random() * 360
+            new_x = ti.math.cos(degree) * radius + 0.5
+            new_y = ti.math.sin(degree) * radius + 0.5
+            x[i] = [new_x, new_y]
         material[i] = 1 # 0: fluid 1: jelly 2: snow
         v[i] = [0, 0]
         F[i] = ti.Matrix([[1, 0], [0, 1]])
@@ -144,12 +141,11 @@ def reset():
     
     # Init water
     # TODO: think about paramaters
-    for i in range(ratio*group_size, n_particles):
+    for i in range(ratio * n_particles, n_particles):
         radius = ti.random() * ball_radius
         degree = ti.random() * 2*ti.math.pi
-        spread = 0.1
-        new_x = ti.math.cos(degree)*radius*spread + 0.5
-        new_y = ti.math.sin(degree)*radius*spread + 0.05
+        new_x = ti.math.cos(degree)*radius + 0.5
+        new_y = ti.math.sin(degree)*radius + 0.05
         x[i] = [new_x, new_y]
         material[i] = 0 # 0: fluid 1: jelly 2: snow
         v[i] = [0, 0]
@@ -164,75 +160,8 @@ def reset():
 def random_pos() -> ti.f32:
     return ti.random()
 
-def play(ac):
-    gui = ti.GUI("Robot is playing rn", res=RESOLUTION, background_color=0xABACAC)
-    reset()
-    gravity[None] = [0, -1]
-    particle_shot_counter = 0
-    for frame in range(20000):
-        states = None
-        action = ac.step(states)
-        """
-        Managing gui inputs
-        r - Reset to initial state
-        esc - quits the program
-        any other button - sets the graviry to 0,1 xd
-        LMB - Shoot dihydrogen monoxide from the Particle accelerator
-        RMB - Left for debugging haha (secret)
-        A/D - move the ~jet~ particle accelerator to the left/right
-        """
-        if action == 'r':
-            reset()
-        elif action in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
-            break
-        elif action == 'a':
-            tmp = ti.math.max(jet_attributes[None][0] - jet_speed, jet_r/2)
-            jet_attributes[None] = [tmp, jet_attributes[None][1]]
-        elif action == 'd':
-            tmp = ti.math.min(jet_attributes[None][0] + jet_speed, 1 - jet_r/2)
-            jet_attributes[None] = [tmp, jet_attributes[None][1]]
-        
-        # update jet direction
-        mouse = gui.get_cursor_pos()
-        if mouse[1] > 1e-4:
-            jet_x = jet_attributes[None][0]
-            # Compute the angle between the cursor and the jet's location
-            mouse_jet_angle = ti.math.acos((mouse[0]- jet_x)/ti.math.sqrt(ti.math.max(1e-4,(mouse[0] - jet_x)**2 + mouse[1]**2)))
-            if mouse_jet_angle - 1.1*jet_angular_speed > jet_attributes[None][1]:
-                jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1] + jet_angular_speed)
-            elif mouse_jet_angle + 1.1*jet_angular_speed < jet_attributes[None][1]:
-                jet_attributes[None][1] = ti.math.max(jet_attributes[None][1] - jet_angular_speed)
-        
-        # LMB is pressed, shoot water
-        if action == 'LMB':
-            particle_shot_counter = shoot_length
-        if particle_shot_counter > 0:
-            batch = 20
-            start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles) #TODO Parametrize number of ball particles
-            for i in range(start, start + batch):
-                new_x = random_pos() * jet_r
-                new_y = random_pos() * 2 / n_grid
-                x[i] = [new_x + jet_attributes[None][0] - jet_r/2, new_y + floor_h] 
-                v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
-            particle_shot_counter -= 1
-        
-        gui.circle((mouse[0], mouse[1]), color=0x336699, radius=15)
-        attractor_pos[None] = [mouse[0], mouse[1]]
-        attractor_strength[None] = 0
-        if gui.is_pressed(ti.GUI.RMB):
-            attractor_strength[None] = -1 #shoot air
-
-        for s in range(int(2e-3 // dt)):
-            #pass
-            substep()
-
-        # display particles
-        gui.circles(x.to_numpy(),
-                    radius=1.5,
-                    palette=[0x068587, 0xED553B, 0xEEEE00],
-                    palette_indices=material)
-
-        # ugly jet
+def render_jet(gui, jet_attributes):
+    # ugly jet
         jet_h = 0.04
         jet_color = 0x444444
         origin = [jet_attributes[None][0], floor_h]
@@ -254,9 +183,68 @@ def play(ac):
         gui.triangle(point_A1, point_B1, point_C1, color=jet_color)
         gui.triangle(point_A1, point_C1, point_D1, color=jet_color)
 
+def play(ac):
+    gui = ti.GUI("Robot is playing rn", res=RESOLUTION, background_color=0xABACAC)
+    reset()
+    gravity[None] = [0, -1]
+    particle_shot_counter = 0
+    for frame in range(20000):
+        states = None
+        action = ac.step(states)
+        """
+        Managing gui inputs
+        r - Reset to initial state
+        esc - quits the program
+        
+        action
+            - change jet location
+            - change jet direction
+            - Shoot dihydrogen monoxide from the Particle accelerator
+        """
+        if gui.get_event(ti.GUI.PRESS):
+            if gui.event.key == 'r':
+                reset()
+            elif gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
+                break
+        # action = [float x.acc, float angular acc, bool jet_on]
+
+        # update jet location
+        new_jet_x = ti.math.min(ti.math.max(jet_attributes[None][0] + action[0], jet_r/2), 1 - jet_r/2)
+        jet_attributes[None] = [new_jet_x, jet_attributes[None][1]]
+
+        # update jet direction
+        jet_attributes[None][1] = ti.math.min(ti.math.max(ti.math.pi, jet_attributes[None][1] + action[1]), 0)
+        
+        # LMB is pressed, shoot water
+        if action[2]:
+            particle_shot_counter = shoot_length
+        if particle_shot_counter > 0:
+            batch = 20
+            start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles)
+            for i in range(start, start + batch):
+                new_x = random_pos() * jet_r
+                new_y = random_pos() * 2 / n_grid
+                x[i] = [new_x + jet_attributes[None][0] - jet_r/2, new_y + floor_h] 
+                v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
+            particle_shot_counter -= 1
+
+        for s in range(int(2e-3 // dt)):
+            substep()
+
+        # display particles
+        gui.circles(x.to_numpy(),
+                    radius=1.5,
+                    palette=[0x068587, 0xED553B, 0xEEEE00],
+                    palette_indices=material)
+
+        # display ball
+        gui.circle(x[0], radius=600*ball_radius, color=0xED553B)
+        gui.circle(x[1], radius=1.5, color=0xEEEE00)
+
+        render_jet(gui, jet_attributes)
+
         # Change to gui.show(f'{frame:06d}.png') to write images to disk
         gui.show()
-
 
 def main():
     gui = ti.GUI("Neil's and Robert's fun project uwu", res=RESOLUTION, background_color=0xABACAC)
@@ -302,7 +290,7 @@ def main():
             particle_shot_counter = shoot_length
         if particle_shot_counter > 0:
             batch = 20
-            start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles) #TODO Parametrize number of ball particles
+            start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles)
             for i in range(start, start + batch):
                 new_x = random_pos() * jet_r
                 new_y = random_pos() * 2 / n_grid
@@ -310,14 +298,9 @@ def main():
                 v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
             particle_shot_counter -= 1
         
-        gui.circle((mouse[0], mouse[1]), color=0x336699, radius=15)
-        attractor_pos[None] = [mouse[0], mouse[1]]
-        attractor_strength[None] = 0
-        if gui.is_pressed(ti.GUI.RMB):
-            attractor_strength[None] = -1 #shoot air
+        gui.circle((mouse[0], mouse[1]), color=0x336699, radius=10)
 
         for s in range(int(2e-3 // dt)):
-            #pass
             substep()
 
         # display particles
@@ -326,27 +309,11 @@ def main():
                     palette=[0x068587, 0xED553B, 0xEEEE00],
                     palette_indices=material)
 
-        # ugly jet
-        jet_h = 0.04
-        jet_color = 0x444444
-        origin = [jet_attributes[None][0], floor_h]
-        vec1 = [ti.math.cos(jet_attributes[None][1]), ti.math.sin(jet_attributes[None][1])]
-        vec2 = [vec1[1], -vec1[0]]
-        ref_A = [origin[0] + jet_r/2 * vec2[0], origin[1] + jet_r/2 * vec2[1]]
-        ref_B = [origin[0] - jet_r/2 * vec2[0], origin[1] - jet_r/2 * vec2[1]]
-        point_A = [ref_A[0] - vec1[0], ref_A[1] - vec1[1]]
-        point_B = [ref_B[0] - vec1[0], ref_B[1] - vec1[1]]
-        point_C = [ref_B[0] + jet_h * vec1[0], ref_B[1] + jet_h * vec1[1]]
-        point_D = [ref_A[0] + jet_h * vec1[0], ref_A[1] + jet_h * vec1[1]]
-        gui.triangle(point_A, point_B, point_C, color=jet_color)
-        gui.triangle(point_A, point_C, point_D, color=jet_color)
-        # upper part is wider
-        point_A1 = [ref_A[0] + jet_r/8 * vec2[0], ref_A[1] + jet_r/8 * vec2[1]]
-        point_B1 = [ref_B[0] - jet_r/8 * vec2[0], ref_B[1] - jet_r/8 * vec2[1]]
-        point_C1 = [point_C[0] - jet_r/8 * vec2[0], point_C[1] - jet_r/8 * vec2[1]]
-        point_D1 = [point_D[0] + jet_r/8 * vec2[0], point_D[1] + jet_r/8 * vec2[1]]
-        gui.triangle(point_A1, point_B1, point_C1, color=jet_color)
-        gui.triangle(point_A1, point_C1, point_D1, color=jet_color)
+        # display ball
+        gui.circle(x[0], radius=600*ball_radius, color=0xED553B)
+        gui.circle(x[1], radius=1.5, color=0xEEEE00)
+
+        render_jet(gui, jet_attributes)
 
         # Change to gui.show(f'{frame:06d}.png') to write images to disk
         gui.show()
