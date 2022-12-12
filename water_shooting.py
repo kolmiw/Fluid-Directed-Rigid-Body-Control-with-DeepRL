@@ -162,26 +162,26 @@ def random_pos() -> ti.f32:
 
 def render_jet(gui, jet_attributes):
     # ugly jet
-        jet_h = 0.04
-        jet_color = 0x444444
-        origin = [jet_attributes[None][0], floor_h]
-        vec1 = [ti.math.cos(jet_attributes[None][1]), ti.math.sin(jet_attributes[None][1])]
-        vec2 = [vec1[1], -vec1[0]]
-        ref_A = [origin[0] + jet_r/2 * vec2[0], origin[1] + jet_r/2 * vec2[1]]
-        ref_B = [origin[0] - jet_r/2 * vec2[0], origin[1] - jet_r/2 * vec2[1]]
-        point_A = [ref_A[0] - vec1[0], ref_A[1] - vec1[1]]
-        point_B = [ref_B[0] - vec1[0], ref_B[1] - vec1[1]]
-        point_C = [ref_B[0] + jet_h * vec1[0], ref_B[1] + jet_h * vec1[1]]
-        point_D = [ref_A[0] + jet_h * vec1[0], ref_A[1] + jet_h * vec1[1]]
-        gui.triangle(point_A, point_B, point_C, color=jet_color)
-        gui.triangle(point_A, point_C, point_D, color=jet_color)
-        # upper part is wider
-        point_A1 = [ref_A[0] + jet_r/8 * vec2[0], ref_A[1] + jet_r/8 * vec2[1]]
-        point_B1 = [ref_B[0] - jet_r/8 * vec2[0], ref_B[1] - jet_r/8 * vec2[1]]
-        point_C1 = [point_C[0] - jet_r/8 * vec2[0], point_C[1] - jet_r/8 * vec2[1]]
-        point_D1 = [point_D[0] + jet_r/8 * vec2[0], point_D[1] + jet_r/8 * vec2[1]]
-        gui.triangle(point_A1, point_B1, point_C1, color=jet_color)
-        gui.triangle(point_A1, point_C1, point_D1, color=jet_color)
+    jet_h = 0.04
+    jet_color = 0x444444
+    origin = [jet_attributes[None][0], floor_h]
+    vec1 = [ti.math.cos(jet_attributes[None][1]), ti.math.sin(jet_attributes[None][1])]
+    vec2 = [vec1[1], -vec1[0]]
+    ref_A = [origin[0] + jet_r/2 * vec2[0], origin[1] + jet_r/2 * vec2[1]]
+    ref_B = [origin[0] - jet_r/2 * vec2[0], origin[1] - jet_r/2 * vec2[1]]
+    point_A = [ref_A[0] - vec1[0], ref_A[1] - vec1[1]]
+    point_B = [ref_B[0] - vec1[0], ref_B[1] - vec1[1]]
+    point_C = [ref_B[0] + jet_h * vec1[0], ref_B[1] + jet_h * vec1[1]]
+    point_D = [ref_A[0] + jet_h * vec1[0], ref_A[1] + jet_h * vec1[1]]
+    gui.triangle(point_A, point_B, point_C, color=jet_color)
+    gui.triangle(point_A, point_C, point_D, color=jet_color)
+    # upper part is wider
+    point_A1 = [ref_A[0] + jet_r/8 * vec2[0], ref_A[1] + jet_r/8 * vec2[1]]
+    point_B1 = [ref_B[0] - jet_r/8 * vec2[0], ref_B[1] - jet_r/8 * vec2[1]]
+    point_C1 = [point_C[0] - jet_r/8 * vec2[0], point_C[1] - jet_r/8 * vec2[1]]
+    point_D1 = [point_D[0] + jet_r/8 * vec2[0], point_D[1] + jet_r/8 * vec2[1]]
+    gui.triangle(point_A1, point_B1, point_C1, color=jet_color)
+    gui.triangle(point_A1, point_C1, point_D1, color=jet_color)
 
 def play(ac):
     gui = ti.GUI("Robot is playing rn", res=RESOLUTION, background_color=0xABACAC)
@@ -283,7 +283,7 @@ def main():
             if mouse_jet_angle - 1.1*jet_angular_speed > jet_attributes[None][1]:
                 jet_attributes[None][1] = ti.math.min(ti.math.pi, jet_attributes[None][1] + jet_angular_speed)
             elif mouse_jet_angle + 1.1*jet_angular_speed < jet_attributes[None][1]:
-                jet_attributes[None][1] = ti.math.max(jet_attributes[None][1] - jet_angular_speed)
+                jet_attributes[None][1] = ti.math.max(0, jet_attributes[None][1] - jet_angular_speed)
         
         # LMB is pressed, shoot water
         if gui.is_pressed(ti.GUI.LMB):
