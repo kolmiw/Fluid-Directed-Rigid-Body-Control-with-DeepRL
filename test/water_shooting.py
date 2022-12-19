@@ -4,12 +4,12 @@ import math
 from mpm_solver import MPMSolver
 
 RESOLUTION = 512
-GRID_RESOLUTION = (32, 32, 32)
-DIM = len(GRID_RESOLUTION)
+GRID_RESOLUTION = 128
+MATERIAL = MPMSolver.material_water # or material_snow
 BG_COLOR = 0xBBBBBB
 BALL_R = 0.025
 JET_SPEED = 0.05
-JET_R = BALL_R * 2
+JET_R = BALL_R * 3
 JET_ANG_SPEED = JET_SPEED * ti.math.pi
 JET_POWER = 5
 FLOOR_H = 0.03
@@ -19,7 +19,7 @@ COLORS = [0x3399FF, 0xED553B, 0xEEEEF0, 0xFFFF00]
 
 def render_jet(gui, jet_params):
     # ugly jet
-        jet_h = 0.04
+        jet_h = 0.02
         jet_color = 0x444444
         origin = [jet_params[0], FLOOR_H]
         vec1 = [ti.math.cos(jet_params[1]), ti.math.sin(jet_params[1])]
@@ -43,10 +43,10 @@ def render_jet(gui, jet_params):
 def play(ac):
     ti.init(arch=ti.cuda)  # Try to run on GPU
     gui = ti.GUI("Robot is playing rn", res=RESOLUTION, background_color=BG_COLOR)
-    mpm = MPMSolver(res=GRID_RESOLUTION)
+    mpm = MPMSolver(res=(GRID_RESOLUTION, GRID_RESOLUTION))
     mpm.add_sphere(center=[0.5, 0.5],
              radius=BALL_R, 
-             sample_density=2**DIM,
+             sample_density=4,
              material=MPMSolver.material_elastic)
     jet_params = [0.5, ti.math.pi/2]
     particle_shot_counter = 0
@@ -83,7 +83,7 @@ def play(ac):
             particle_shot_counter -= 1        
             mpm.add_cube(lower_corner=[jet_params[0] - JET_R/2, FLOOR_H - SHOT_H],
                         cube_size=[JET_R, SHOT_H],
-                        material=MPMSolver.material_snow,
+                        material=MATERIAL,
                         velocity=[JET_POWER * ti.math.cos(jet_params[1]), JET_POWER * ti.math.sin(jet_params[1])])
 
         mpm.step(2e-3)
@@ -100,10 +100,10 @@ def play(ac):
 def main():
     ti.init(arch=ti.cuda)  # Try to run on GPU
     gui = ti.GUI("Taichi Elements", res=RESOLUTION, background_color=BG_COLOR)
-    mpm = MPMSolver(res=GRID_RESOLUTION)
+    mpm = MPMSolver(res=(GRID_RESOLUTION, GRID_RESOLUTION))
     mpm.add_sphere(center=[0.5, 0.5],
              radius=BALL_R, 
-             sample_density=2**DIM,
+             sample_density=4,
              material=MPMSolver.material_elastic)
     jet_params = [0.5, ti.math.pi/2]
     particle_shot_counter = 0
@@ -134,7 +134,7 @@ def main():
             particle_shot_counter -= 1
             mpm.add_cube(lower_corner=[jet_params[0] - JET_R/2, FLOOR_H - SHOT_H],
                         cube_size=[JET_R, SHOT_H],
-                        material=MPMSolver.material_snow,
+                        material=MATERIAL,
                         velocity=[JET_POWER * ti.math.cos(jet_params[1]), JET_POWER * ti.math.sin(jet_params[1])])
 
         mpm.step(2e-3)
@@ -162,10 +162,10 @@ def render_jet_3D(gui, jet_params):
 def play_3D(ac):
     ti.init(arch=ti.cuda)  # Try to run on GPU
     gui = ti.GUI("Robot is playing rn", res=RESOLUTION, background_color=BG_COLOR)
-    mpm = MPMSolver(res=GRID_RESOLUTION)
+    mpm = MPMSolver(res=(GRID_RESOLUTION, GRID_RESOLUTION, GRID_RESOLUTION))
     mpm.add_sphere(center=[0.5, 0.5, 0.5],
              radius=BALL_R, 
-             sample_density=4**DIM,
+             sample_density=64,
              material=MPMSolver.material_elastic)
     jet_params = [0.5, 0.5, 0, ti.math.pi/2]
     particle_shot_counter = 0
@@ -204,7 +204,7 @@ def play_3D(ac):
             particle_shot_counter -= 1        
             mpm.add_cube(lower_corner=[jet_params[0] - JET_R/2, FLOOR_H - SHOT_H, jet_params[0] - JET_R/2],
                         cube_size=[JET_R, SHOT_H, JET_R],
-                        material=MPMSolver.material_snow,
+                        material=MATERIAL,
                         velocity=[JET_POWER * ti.math.cos(jet_params[2]) * ti.math.sin(jet_params[3]), JET_POWER * ti.math.cos(jet_params[3]), JET_POWER * ti.math.sin(jet_params[2]) * ti.math.sin(jet_params[3])])
 
         mpm.step(2e-3)
@@ -242,10 +242,10 @@ def play_3D(ac):
 def main_3D():
     ti.init(arch=ti.cuda)  # Try to run on GPU
     gui = ti.GUI("Taichi Elements", res=RESOLUTION, background_color=BG_COLOR)
-    mpm = MPMSolver(res=GRID_RESOLUTION)
+    mpm = MPMSolver(res=(GRID_RESOLUTION, GRID_RESOLUTION, GRID_RESOLUTION))
     mpm.add_sphere(center=[0.5, 0.5, 0.5],
              radius=BALL_R, 
-             sample_density=4**DIM,
+             sample_density=64,
              material=MPMSolver.material_elastic)
     jet_params = [0.5, 0.5, 0, ti.math.pi/2]
     particle_shot_counter = 0
@@ -287,7 +287,7 @@ def main_3D():
             particle_shot_counter -= 1
             mpm.add_cube(lower_corner=[jet_params[0] - JET_R/2, FLOOR_H - SHOT_H, jet_params[1] - JET_R/2],
                         cube_size=[JET_R, SHOT_H, JET_R],
-                        material=MPMSolver.material_water,
+                        material=MATERIAL,
                         velocity=[JET_POWER * ti.math.cos(jet_params[2]) * ti.math.sin(jet_params[3]), JET_POWER * ti.math.cos(jet_params[3]), JET_POWER * ti.math.sin(jet_params[2]) * ti.math.sin(jet_params[3])])
 
         mpm.step(2e-3)
@@ -323,4 +323,4 @@ def main_3D():
 
 if __name__ == "__main__":
     # execute only if run as a script
-    main_3D()
+    main()
