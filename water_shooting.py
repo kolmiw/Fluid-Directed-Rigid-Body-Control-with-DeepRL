@@ -1,4 +1,6 @@
 import taichi as ti
+import torch
+import numpy as np
 
 ti.init(arch=ti.gpu)  # Try to run on GPU
 
@@ -36,7 +38,21 @@ grid_v = ti.Vector.field(2, dtype=float, shape=(n_grid, n_grid))  # grid node mo
 grid_m = ti.field(dtype=float, shape=(n_grid, n_grid))  # grid node mass
 gravity = ti.Vector.field(2, dtype=float, shape=())
 jet_attributes = ti.Vector.field(2, dtype=float, shape=())
+state = ti.Vector.field(2, dtype=float, shape=(n_particles+1))
 
+
+def reward(state, action, y, wc=1, wr=1, we=1):
+    """
+    Computes the loss according to the paper.
+    states = [v,c, additional jet params?]
+    action = [x'', beta'', delta]
+    """
+    #TODO verify numerical stability
+    state_np = state.to_numpy()
+    lc = wc * torch.tensor([torch.exp(torch.tensor(-1*(state[n_particles]-y).norm()))])
+    lr = wr * torch.tensor([torch.exp(-torch.tensor(state_np[0]).norm())]) 
+    le = we * (1 if action[2] else 0)
+    return lc+lr+le
 
 @ti.kernel
 def substep():
@@ -113,7 +129,9 @@ def substep():
         v[p], C[p] = new_v, new_C
         x[p] += dt * v[p]  # advection
 
-
+def get_state():
+    state_np = state.to_numpy()
+    return state_np
 
 
 @ti.kernel
@@ -155,6 +173,10 @@ def reset():
     
     # Init jet
     jet_attributes[None] = [0.5, ti.math.pi/2]
+    for i in range(0, n_particles):
+        state[i] = v[i]
+    state[n_particles] = x[0]
+    
 
 @ti.kernel
 def random_pos() -> ti.f32:
@@ -245,6 +267,50 @@ def play(ac):
 
         # Change to gui.show(f'{frame:06d}.png') to write images to disk
         gui.show()
+
+def transition(act):
+    gravity[None] = [0, -1]
+    particle_shot_counter = 0
+    act_dict = {
+        0:[0,0,False],
+        1:[0,0,True],
+        2:[0.1,0,False],
+        3:[0.1,0,True],
+        4:[0,0.1,False],
+        5:[0,0.1,True],
+        6:[0.1,0.1,False],
+        7:[0.1,0.1,True],
+    }
+    action = act_dict[act]
+    # action = [float x.acc, float angular acc, bool jet_on]
+    # update jet location
+    new_jet_x = ti.math.min(ti.math.max(jet_attributes[None][0] + action[0], jet_r/2), 1 - jet_r/2)
+    jet_attributes[None] = [new_jet_x, jet_attributes[None][1]]
+
+    # update jet direction
+    jet_attributes[None][1] = ti.math.min(ti.math.max(ti.math.pi, jet_attributes[None][1] + action[1]), 0)
+    
+    # LMB is pressed, shoot water
+    if action[2]:
+        particle_shot_counter = shoot_length
+    if particle_shot_counter > 0:
+        batch = 20
+        start = int(random_pos() * (n_particles * (1 - ratio) - batch) + ratio * n_particles)
+        for i in range(start, start + batch):
+            new_x = random_pos() * jet_r
+            new_y = random_pos() * 2 / n_grid
+            x[i] = [new_x + jet_attributes[None][0] - jet_r/2, new_y + floor_h] 
+            v[i] = [jet_power * ti.math.cos(jet_attributes[None][1]), jet_power * ti.math.sin(jet_attributes[None][1])]
+        particle_shot_counter -= 1
+
+    for s in range(int(2e-3 // dt)):
+        substep()
+    for i in range(n_particles):
+        state[i] = v[i]
+    state[n_particles] = x[0]
+    reward(state, action, y=ti.Vector([0.5,0.5]))
+    return  get_state(), reward(state, action=action, y=ti.Vector([0.5,0.5])), False #TODO: set terminal state to something else maybe?
+
 
 def main():
     gui = ti.GUI("Neil's and Robert's fun project uwu", res=RESOLUTION, background_color=0xABACAC)
