@@ -185,9 +185,9 @@ class Agent:
 
         obs_dim = [4002]
         act_dim = []
-        steps_per_epoch = 2000
+        steps_per_epoch = 300
         epochs = 24
-        max_ep_len = 2000
+        max_ep_len = 300
         gamma = 0.99
         lam = 0.97
         buf = VPGBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
