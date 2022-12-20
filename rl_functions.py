@@ -185,9 +185,9 @@ class Agent:
 
         obs_dim = [4002]
         act_dim = []
-        steps_per_epoch = 300
+        steps_per_epoch = 2000
         epochs = 24
-        max_ep_len = 300
+        max_ep_len = 2000
         gamma = 0.99
         lam = 0.97
         buf = VPGBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
@@ -240,7 +240,7 @@ class Agent:
             data = buf.get()
             self.pi_update(data)
             self.v_update(data)
-
+            torch.save(self.ac, "params.pt")
         return True
 
     def get_action(self, obs):
@@ -266,7 +266,11 @@ def main():
     setting.update({'jet_angular_speed': (setting['jet_speed'] * math.pi)})
     env = water_shooting
     agent = Agent(env)
-    agent.train()
+    should_train = input("Do I train the model? (y/n)")
+    if should_train == 'y':
+        agent.train()
+    else:
+        agent.ac = torch.load("params.pt")
     episode_length = 3
     n_eval = 5
     returns = []
