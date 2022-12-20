@@ -172,7 +172,7 @@ def reset():
         C[i] = ti.Matrix.zero(float, 2, 2)  
     
     # Init jet
-    jet_attributes[None] = [0.5, ti.math.pi/2]
+    jet_attributes[None] = [0.5, ti.math.pi/2]#ti.math.pi/2]
     for i in range(0, n_particles):
         state[i] = v[i]
     state[n_particles] = x[0]
@@ -210,9 +210,32 @@ def play(ac):
     reset()
     gravity[None] = [0, -1]
     particle_shot_counter = 0
+    act_dict = {
+        0:[0,0,False],
+        1:[0,0,True],
+        2:[1,0,False],
+        3:[1,0,True],
+        4:[0,1,False],
+        5:[0,1,True],
+        6:[1,1,False],
+        7:[1,1,True],
+        8:[0,0,False],
+        9:[0,0,True],
+        10:[-1,0,False],
+        11:[-1,0,True],
+        12:[0,-1,False],
+        13:[0,-1,True],
+        14:[-1,-1,False],
+        15:[-1,-1,True],
+    }
+
     for frame in range(20000):
-        states = None
-        action = ac.step(states)
+        states = get_state()
+        states = states.flatten()
+        act = act_dict[ac.get_action(states)]
+        
+        action = [act[0]*0.01, act[1]*0.01, act[2]]
+        print("hello", jet_attributes)
         """
         Managing gui inputs
         r - Reset to initial state
@@ -235,7 +258,7 @@ def play(ac):
         jet_attributes[None] = [new_jet_x, jet_attributes[None][1]]
 
         # update jet direction
-        jet_attributes[None][1] = ti.math.min(ti.math.max(ti.math.pi, jet_attributes[None][1] + action[1]), 0)
+        jet_attributes[None][1] = ti.math.max(ti.math.min(ti.math.pi, jet_attributes[None][1] + action[1]), 0)
         
         # LMB is pressed, shoot water
         if action[2]:
@@ -274,14 +297,22 @@ def transition(act):
     act_dict = {
         0:[0,0,False],
         1:[0,0,True],
-        2:[0.1,0,False],
-        3:[0.1,0,True],
-        4:[0,0.1,False],
-        5:[0,0.1,True],
-        6:[0.1,0.1,False],
-        7:[0.1,0.1,True],
+        2:[1,0,False],
+        3:[1,0,True],
+        4:[0,1,False],
+        5:[0,1,True],
+        6:[1,1,False],
+        7:[1,1,True],
+        8:[0,0,False],
+        9:[0,0,True],
+        10:[-1,0,False],
+        11:[-1,0,True],
+        12:[0,-1,False],
+        13:[0,-1,True],
+        14:[-1,-1,False],
+        15:[-1,-1,True],
     }
-    action = act_dict[act]
+    action = [act_dict[act][0]*0.01, act_dict[act][1]*0.01, act_dict[act][2]]
     # action = [float x.acc, float angular acc, bool jet_on]
     # update jet location
     new_jet_x = ti.math.min(ti.math.max(jet_attributes[None][0] + action[0], jet_r/2), 1 - jet_r/2)
@@ -309,7 +340,7 @@ def transition(act):
         state[i] = v[i]
     state[n_particles] = x[0]
     reward(state, action, y=ti.Vector([0.5,0.5]))
-    return  get_state(), reward(state, action=action, y=ti.Vector([0.5,0.5])), False #TODO: set terminal state to something else maybe?
+    return  get_state(), reward(state, action=action, y=ti.Vector([0.5,0.5])), False
 
 
 def main():

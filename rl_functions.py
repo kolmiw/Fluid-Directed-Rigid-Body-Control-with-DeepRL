@@ -8,6 +8,7 @@ import random
 import scipy.signal
 from torch.distributions.categorical import Categorical
 from torch.optim import Adam
+import tqdm
 
 class EncDecoder(nn.Module):
     def __init__(self, big_state, small_state):
@@ -143,7 +144,7 @@ class Agent:
         self.l = 2  # Layer number of networks
         self.obs_dim = 4002
         # Initialize Actor-Critic
-        self.ac = MLPActorCritic(self.obs_dim, hidden_sizes=[self.hid] * self.l, act_dim=3)
+        self.ac = MLPActorCritic(self.obs_dim, hidden_sizes=[self.hid] * self.l, act_dim=16)
 
         pi_lr = 3e-3
         vf_lr = 1e-3
@@ -161,7 +162,7 @@ class Agent:
         self.pi_optimizer.zero_grad()
 
         _, logp = self.ac.pi(obs, act)
-        loss = -(phi * logp).mean()
+        loss = (phi * logp).mean()
         loss.backward()
         self.pi_optimizer.step()
 
@@ -184,9 +185,9 @@ class Agent:
 
         obs_dim = [4002]
         act_dim = []
-        steps_per_epoch = 3
-        epochs = 5
-        max_ep_len = 300
+        steps_per_epoch = 2000
+        epochs = 24
+        max_ep_len = 2000
         gamma = 0.99
         lam = 0.97
         buf = VPGBuffer(obs_dim, act_dim, steps_per_epoch, gamma, lam)
@@ -199,8 +200,7 @@ class Agent:
         for epoch in range(epochs):
             ep_returns = []
 
-            for t in range(steps_per_epoch):
-                print("state", type(state))
+            for t in tqdm.tqdm(range(steps_per_epoch), "Computing the steps for the current epoch"):
                 state = state.flatten()
                 a, v, logp = self.ac.step(torch.from_numpy(state))
                 next_state, r, terminal = self.env.transition(a)
@@ -218,7 +218,6 @@ class Agent:
 
                 if terminal or timeout or epoch_ended:
                     # If trajectory didn't reach terminal state, bootstrap value target
-                    print(state)
                     state = state.flatten()
                     if epoch_ended:
                         _, v, _ = self.ac.step(torch.from_numpy(state))
@@ -227,11 +226,10 @@ class Agent:
                     if timeout or terminal:
                         ep_returns.append(ep_ret) # Only store return when episode ended
                     buf.end_traj(v)
-                    print("hello")
-                    print(state)
+
                     self.env.reset()
                     state, ep_ret, ep_len = self.env.get_state(), 0, 0
-                    print(state)
+
 
             mean_return = np.mean(ep_returns) if len(ep_returns) > 0 else np.nan
             if len(ep_returns) == 0:
@@ -265,13 +263,12 @@ class DummyActorCritic(nn.Module):
 def main():
     with open('env_setting.json', 'r') as file:
         setting = json.load(file)
-
     setting.update({'jet_angular_speed': (setting['jet_speed'] * math.pi)})
     env = water_shooting
     agent = Agent(env)
     agent.train()
-    episode_length = 300
-    n_eval = 100
+    episode_length = 3
+    n_eval = 5
     returns = []
     print("Evaluating the agent...")
 
@@ -284,11 +281,12 @@ def main():
         env.reset()
         for t in range(episode_length):
             state = state.flatten()
-            print("The stat is", state, "right now")
             action = agent.get_action(state)
             state, reward, terminal = env.transition(action)
             cumulative_return += reward
-    torch.save(agent, "./agent_params.pt")
+    torch.save(agent.ac, "params.pt")
+
+    env.play(ac=agent)
 
 
 
